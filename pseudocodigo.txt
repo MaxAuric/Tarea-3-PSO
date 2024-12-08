@@ -1,0 +1,164 @@
+FUNCION PSO(fncMax : FUNCION, valores_iniciales : ARREGLO, limites : ARREGLO, num_particulas : ENTERO, max_iteraciones : ENTERO) 
+VAR:
+    mejor_valor_global : REAL
+    mejor_posicion_global : ARREGLO
+    particulas : ARREGLO
+    historico_roi : ARREGLO
+    i, iteracion : ENTERO
+    particula : PARTICULA
+INICIO
+    mejor_valor_global <- -1
+    mejor_posicion_global <- [ ]
+    historico_roi <- [ ]
+    particulas <- [ ]
+
+    PARA i DESDE 1 HASTA num_particulas HACER
+        AGREGAR Particula(valores_iniciales) A particulas
+    FIN PARA
+
+    PARA iteracion DESDE 1 HASTA max_iteraciones HACER
+        PARA CADA particula EN particulas HACER
+            particula.evaluar(fncMax)
+            SI particula.valor_actual > mejor_valor_global O mejor_valor_global == -1 ENTONCES
+                mejor_posicion_global <- COPIAR(particula.posicion)
+                mejor_valor_global <- particula.valor_actual
+            FIN SI
+        FIN PARA
+
+        PARA CADA particula EN particulas HACER
+            particula.actualizar_velocidad(mejor_posicion_global)
+            particula.actualizar_posicion(limites)
+        FIN PARA
+
+        AGREGAR fncTotalROI(mejor_posicion_global) A historico_roi
+    FIN PARA
+
+    LLAMAR mostrar_resultados(mejor_posicion_global)
+FIN FUNCION
+
+
+FUNCION Particula(valores_iniciales : ARREGLO) 
+VAR:
+    posicion : ARREGLO
+    velocidad : ARREGLO
+    mejor_posicion : ARREGLO
+    mejor_valor : REAL
+    valor_actual : REAL
+    i : ENTERO
+INICIO
+    posicion <- [ ]
+    velocidad <- [ ]
+    mejor_posicion <- [ ]
+    mejor_valor <- -1
+    valor_actual <- -1
+
+    PARA i DESDE 1 HASTA LONGITUD(valores_iniciales) HACER
+        AGREGAR RANDOM(-1, 1) A velocidad
+        AGREGAR valores_iniciales[i] A posicion
+    FIN PARA
+FIN FUNCION
+
+
+FUNCION evaluar(particula : PARTICULA, funcion : FUNCION) 
+INICIO
+    particula.valor_actual <- funcion(particula.posicion)
+    SI particula.valor_actual > particula.mejor_valor O particula.mejor_valor == -1 ENTONCES
+        particula.mejor_posicion <- COPIAR(particula.posicion)
+        particula.mejor_valor <- particula.valor_actual
+    FIN SI
+FIN FUNCION
+
+
+FUNCION actualizar_velocidad(particula : PARTICULA, mejor_posicion_global : ARREGLO, w : REAL, c1 : REAL, c2 : REAL) 
+VAR:
+    i : ENTERO
+    r1, r2 : REAL
+    componente_cognitiva, componente_social : REAL
+INICIO
+    PARA i DESDE 1 HASTA LONGITUD(particula.posicion) HACER
+        r1 <- RANDOM(0, 1)
+        r2 <- RANDOM(0, 1)
+
+        componente_cognitiva <- c1 * r1 * (particula.mejor_posicion[i] - particula.posicion[i])
+        componente_social <- c2 * r2 * (mejor_posicion_global[i] - particula.posicion[i])
+        
+        particula.velocidad[i] <- w * particula.velocidad[i] + componente_cognitiva + componente_social
+    FIN PARA
+FIN FUNCION
+
+
+FUNCION actualizar_posicion(particula : PARTICULA, limites : ARREGLO) 
+VAR:
+    i : ENTERO
+    max_salto : REAL
+INICIO
+    PARA i DESDE 1 HASTA LONGITUD(particula.posicion) HACER
+        max_salto <- (limites[i][1] - limites[i][0])
+        
+        SI particula.velocidad[i] < -max_salto ENTONCES
+            particula.velocidad[i] <- -max_salto
+        SINO SI particula.velocidad[i] > max_salto ENTONCES
+            particula.velocidad[i] <- max_salto
+        FIN SI
+
+        particula.posicion[i] <- particula.posicion[i] + particula.velocidad[i]
+
+        SI particula.posicion[i] > limites[i][1] ENTONCES
+            particula.posicion[i] <- limites[i][1]
+        SINO SI particula.posicion[i] < limites[i][0] ENTONCES
+            particula.posicion[i] <- limites[i][0]
+        SINO 
+            particula.posicion[i] <- REDONDEAR(particula.posicion[i])
+        FIN SI
+    FIN PARA
+FIN FUNCION
+
+
+FUNCION mostrar_resultados(mejor_posicion_global : ARREGLO) 
+VAR:
+    total_costo, total_roi, i, cantidad_invertida : REAL
+INICIO
+    total_costo <- 0
+    total_roi <- 0
+
+    PARA i DESDE 1 HASTA LONGITUD(mejor_posicion_global) HACER
+        cantidad_invertida <- mejor_posicion_global[i]
+        total_costo <- total_costo + cantidad_invertida * costos[i]
+        total_roi <- total_roi + cantidad_invertida * rois[i]
+    FIN PARA
+FIN FUNCION
+
+
+FUNCION fncTotalROI(x : ARREGLO) 
+VAR:
+    total_roi, i : REAL
+INICIO
+    total_roi <- 0
+    PARA i DESDE 1 HASTA LONGITUD(x) HACER
+        total_roi <- total_roi + x[i] * rois[i]
+    FIN PARA
+    RETORNAR total_roi
+FIN FUNCION
+
+
+FUNCION fncPenalizarCosto(x : ARREGLO) 
+VAR:
+    total_costo, i : REAL
+INICIO
+    total_costo <- 0
+    PARA i DESDE 1 HASTA LONGITUD(x) HACER
+        total_costo <- total_costo + x[i] * costos[i]
+    FIN PARA
+    
+    SI total_costo > capital_inicial ENTONCES
+        RETORNAR total_costo - capital_inicial
+    SINO
+        RETORNAR 0
+    FIN SI
+FIN FUNCION
+
+
+FUNCION fncMax(x : ARREGLO) 
+INICIO
+    RETORNAR fncTotalROI(x) - fncPenalizarCosto(x)
+FIN FUNCION
